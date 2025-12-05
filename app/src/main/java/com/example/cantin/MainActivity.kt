@@ -1,28 +1,62 @@
 package com.example.cantin
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ShoppingBasket
+import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,12 +64,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -148,11 +184,13 @@ object Destinations {
     const val ORDERS_ROUTE = "orders"
     const val EDIT_PROFILE_ROUTE = "edit_profile"
     const val MESSAGE_ROUTE = "message_inbox"
+    const val ACTIVITY_ROUTE = "activity"
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NotificationHelper.createNotificationChannel(this)
         setContent {
             CantinTheme {
                 CantinApp()
@@ -161,11 +199,31 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
 @Composable
 fun CantinApp() {
     val navController = rememberNavController()
     val cartViewModel: CartViewModel = viewModel()
+    val context = LocalContext.current
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            // Permission Accepted: Do something
+        } else {
+            // Permission Denied: Do something
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = { MyCantenBottomBar(navController = navController) }
@@ -184,20 +242,23 @@ fun CantinApp() {
             composable(Destinations.PROFILE_ROUTE) {
                 ProfilkuScreen(
                     cartViewModel = cartViewModel,
-                    onBackClick = { navController.popBackStack() },
-                    onEditClick = { navController.navigate(Destinations.EDIT_PROFILE_ROUTE) }
+                    onBackClick = { navController.navigateUp() },
+                    onEditClick = { navController.navigate(Destinations.EDIT_PROFILE_ROUTE) },
+                    onFavoritesClick = { navController.navigate(Destinations.FAVORITE_ROUTE) },
+                    onRateProductClick = {},
+                    onActivityClick = { navController.navigate(Destinations.ACTIVITY_ROUTE) }
                 )
             }
-            composable(Destinations.FAVORITE_ROUTE) { 
+            composable(Destinations.FAVORITE_ROUTE) {
                 FavoritScreen(
                     cartViewModel = cartViewModel,
                     navController = navController
                 )
-             }
-            composable(Destinations.ORDERS_ROUTE) { 
+            }
+            composable(Destinations.ORDERS_ROUTE) {
                 KeranjangScreen(
                     cartViewModel = cartViewModel,
-                    onBackClick = { navController.popBackStack() } 
+                    onBackClick = { navController.popBackStack() }
                 )
             }
             composable(Destinations.EDIT_PROFILE_ROUTE) {
@@ -207,6 +268,9 @@ fun CantinApp() {
                 )
             }
             composable(Destinations.MESSAGE_ROUTE) { PlaceholderScreen("Halaman Riwayat Pesan") }
+            composable(Destinations.ACTIVITY_ROUTE) {
+                AktivitaskuScreen(onBackClick = { navController.popBackStack() })
+            }
         }
     }
 }
@@ -266,6 +330,7 @@ fun HomeScreen(cartViewModel: CartViewModel, onProfileClick: () -> Unit) {
     val cartItems by cartViewModel.cartItems.collectAsState()
     val menuItems by cartViewModel.menuItems.collectAsState()
     val userProfile by cartViewModel.userProfile.collectAsState()
+    val context = LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = if (cartItems.isNotEmpty()) 80.dp else 0.dp)) {
@@ -282,7 +347,12 @@ fun HomeScreen(cartViewModel: CartViewModel, onProfileClick: () -> Unit) {
                     onAddToCart = { cartViewModel.addToCart(item) },
                     onIncrease = { cartViewModel.increaseQuantity(item.id) },
                     onDecrease = { cartViewModel.decreaseQuantity(item.id) },
-                    onToggleFavorite = { cartViewModel.toggleFavorite(item.id) }
+                    onToggleFavorite = {
+                        cartViewModel.toggleFavorite(item.id)
+                        if (!item.isFavorite) {
+                            NotificationHelper.showFavoriteNotification(context)
+                        }
+                    }
                 )
             }
         }
@@ -366,17 +436,31 @@ fun KeranjangScreen(cartViewModel: CartViewModel, onBackClick: () -> Unit) {
     val cartItems by cartViewModel.cartItems.collectAsState()
 
     Scaffold(
-        topBar = { PesananAppBar(onBackClick = onBackClick) }
-    ) { padding ->
+        topBar = {
+            TopAppBar(
+                title = { Text("Keranjang") },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = PrimaryOrangeColor,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
+                )
+            )
+        }
+    ) { paddingValues ->
         if (cartItems.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Keranjang Anda Kosong")
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                Text("Keranjangmu masih kosong")
             }
         } else {
-            Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
                 LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(cartItems) { cartItem ->
-                        CartItemCard(
+                    items(cartItems, key = { it.menuItem.id }) { cartItem ->
+                        CartListItem(
                             item = cartItem.menuItem,
                             quantity = cartItem.quantity,
                             onIncrease = { cartViewModel.increaseQuantity(cartItem.menuItem.id) },
@@ -384,93 +468,75 @@ fun KeranjangScreen(cartViewModel: CartViewModel, onBackClick: () -> Unit) {
                         )
                     }
                 }
-                TotalPesanan(itemCount = cartViewModel.totalItemCount, totalAmount = cartViewModel.totalPrice)
+                Spacer(modifier = Modifier.height(8.dp))
+                CheckoutSection(totalPrice = cartViewModel.totalPrice)
             }
         }
     }
 }
 
 @Composable
-fun CartItemCard(
+fun CartListItem(
     item: MenuItem,
     quantity: Int,
     onIncrease: () -> Unit,
     onDecrease: () -> Unit
 ) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = painterResource(id = item.imageResId),
+            contentDescription = item.name,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(4.dp))
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(item.name, fontWeight = FontWeight.SemiBold)
+            Text("Rp ${item.price}", color = Color.Gray, fontSize = 14.sp)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onDecrease, modifier = Modifier.size(32.dp)) {
+                Text("-", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            }
+            Text("$quantity", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            IconButton(onClick = onIncrease, modifier = Modifier.size(32.dp)) {
+                Text("+", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun CheckoutSection(totalPrice: Int) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(painter = painterResource(id = item.imageResId), contentDescription = item.name, contentScale = ContentScale.Crop, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(4.dp)))
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(item.name, fontWeight = FontWeight.SemiBold)
-                Text("Rp ${item.price}", color = Color.Gray, fontSize = 14.sp)
-            }
-             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.background(PrimaryOrangeColor, RoundedCornerShape(4.dp))) {
-                 IconButton(onClick = onDecrease) { Text("-", color = Color.White, fontWeight = FontWeight.Bold) }
-                 Text("$quantity", color = Color.White, fontWeight = FontWeight.Bold)
-                 IconButton(onClick = onIncrease) { Text("+", color = Color.White, fontWeight = FontWeight.Bold) }
-             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun PesananAppBar(onBackClick: () -> Unit) {
-    TopAppBar(
-        title = { Text("Keranjang", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
-        navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali", tint = Color.White) } },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryOrangeColor)
-    )
-}
-
-@Composable
-fun TotalPesanan(itemCount: Int, totalAmount: Int) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            .padding(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = CardOrangeColor)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Jumlah Item", color = Color.White, fontWeight = FontWeight.SemiBold)
-                Text("$itemCount Item", color = Color.White)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Total Pesanan", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text("Rp $totalAmount", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { /* Handle Pesan Sekarang */ }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = PrimaryOrangeColor)) {
-                Text("Pesan Sekarang", color = Color.White)
+        Row(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Total: Rp $totalPrice", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Button(onClick = { /* TODO: Handle checkout */ }, colors = ButtonDefaults.buttonColors(containerColor = Color.White)) {
+                Text("Checkout", color = PrimaryOrangeColor, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun FavoritAppBar() {
-    TopAppBar(
-        title = {
-            Text(
-                text = "Favoritku",
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = PrimaryOrangeColor
-        )
-    )
-}
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritScreen(cartViewModel: CartViewModel, navController: NavController) {
     val menuItems by cartViewModel.menuItems.collectAsState()
@@ -478,29 +544,44 @@ fun FavoritScreen(cartViewModel: CartViewModel, navController: NavController) {
     val cartItems by cartViewModel.cartItems.collectAsState()
 
     Scaffold(
-        topBar = { FavoritAppBar() }
-    ) { padding ->
-        if (favoriteItems.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Anda belum punya item favorit")
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-            ) {
-                items(favoriteItems, key = { it.id }) { item ->
-                    val cartItem = cartItems.find { it.menuItem.id == item.id }
-                    MenuItemCard(
-                        item = item,
-                        quantity = cartItem?.quantity ?: 0,
-                        isFavorite = item.isFavorite,
-                        onAddToCart = { cartViewModel.addToCart(item) },
-                        onIncrease = { cartViewModel.increaseQuantity(item.id) },
-                        onDecrease = { cartViewModel.decreaseQuantity(item.id) },
-                        onToggleFavorite = { cartViewModel.toggleFavorite(item.id) }
-                    )
+        topBar = {
+            TopAppBar(
+                title = { Text("Favorit") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = PrimaryOrangeColor,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White
+                )
+            )
+        }
+    ) { paddingValues ->
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            if (favoriteItems.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Belum ada item favorit")
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    items(favoriteItems, key = { it.id }) { item ->
+                        val cartItem = cartItems.find { it.menuItem.id == item.id }
+                        MenuItemCard(
+                            item = item,
+                            quantity = cartItem?.quantity ?: 0,
+                            isFavorite = item.isFavorite,
+                            onAddToCart = { cartViewModel.addToCart(item) },
+                            onIncrease = { cartViewModel.increaseQuantity(item.id) },
+                            onDecrease = { cartViewModel.decreaseQuantity(item.id) },
+                            onToggleFavorite = { cartViewModel.toggleFavorite(item.id) }
+                        )
+                    }
                 }
             }
         }
@@ -508,21 +589,38 @@ fun FavoritScreen(cartViewModel: CartViewModel, navController: NavController) {
 }
 
 @Composable
+fun UbahProfilScreen(cartViewModel: CartViewModel, onBackClick: () -> Unit) {
+    // Placeholder for now
+    PlaceholderScreen(text = "Ubah Profil")
+}
+
+
+@Composable
 fun HeaderHome(name: String, onProfileClick: () -> Unit) {
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .height(200.dp)
-        .background(PrimaryOrangeColor)) {
-        Row(modifier = Modifier
+    Column(
+        modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            .height(200.dp)
+            .background(PrimaryOrangeColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Column {
                 Text("Halo, $name", color = Color.White, fontSize = 18.sp)
                 Text("Mau pesan apa hari ini?", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 20.sp)
             }
-            Surface(shape = CircleShape, color = Color.White, modifier = Modifier
-                .size(40.dp)
-                .clickable(onClick = onProfileClick)) {}
+            Surface(
+                shape = CircleShape,
+                color = Color.White,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clickable(onClick = onProfileClick)
+            ) {}
         }
         Spacer(modifier = Modifier.weight(1f))
         Card(
@@ -534,7 +632,12 @@ fun HeaderHome(name: String, onProfileClick: () -> Unit) {
             shape = RoundedCornerShape(8.dp),
             colors = CardDefaults.cardColors(containerColor = CardOrangeColor)
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp)
+            ) {
                 Image(painter = painterResource(id = R.drawable.logo_mycanten), "MyCanten Logo", modifier = Modifier.height(60.dp), contentScale = ContentScale.Fit)
                 Text("MyCanten", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
                 Text("Pesan Mudah, Kenyang Cepat", fontSize = 14.sp, color = Color.White)
@@ -544,90 +647,16 @@ fun HeaderHome(name: String, onProfileClick: () -> Unit) {
     Spacer(modifier = Modifier.height(80.dp))
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun UbahProfilScreen(cartViewModel: CartViewModel, onBackClick: () -> Unit) {
-    val userProfile by cartViewModel.userProfile.collectAsState()
-
-    var name by remember { mutableStateOf(userProfile.name) }
-    var phoneNumber by remember { mutableStateOf(userProfile.phoneNumber) }
-    val email = userProfile.email
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Ubah Profil", color = Color.White, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali", tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryOrangeColor)
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Person, contentDescription = "Avatar", modifier = Modifier.size(56.dp), tint = Color.LightGray)
-                Spacer(modifier = Modifier.width(16.dp))
-                Text("Pasang foto yang oke!", style = MaterialTheme.typography.bodyLarge)
-            }
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text("Nama*", style = MaterialTheme.typography.labelSmall)
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text("No HP*", style = MaterialTheme.typography.labelSmall)
-            OutlinedTextField(
-                value = phoneNumber,
-                onValueChange = { phoneNumber = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text("Email*", style = MaterialTheme.typography.labelSmall)
-            OutlinedTextField(
-                value = email,
-                onValueChange = {},
-                modifier = Modifier.fillMaxWidth(),
-                readOnly = true,
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                )
-            )
-            
-            Spacer(modifier = Modifier.weight(1f))
-
-            Button(
-                onClick = {
-                    cartViewModel.updateUserProfile(name, phoneNumber)
-                    onBackClick() // Go back after saving
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = CardOrangeColor)
-            ) {
-                Text("Simpan")
-            }
-        }
-    }
-}
-
 @Composable
 fun SearchBar() {
-    Row(modifier = Modifier.fillMaxWidth().padding(16.dp).background(Color.LightGray.copy(alpha = 0.2f), RoundedCornerShape(24.dp)).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .background(Color.LightGray.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Icon(Icons.Default.Search, "Cari", tint = Color.Gray)
         Spacer(modifier = Modifier.width(8.dp))
         Text("Makanan, Minuman, dan Jajanan", color = Color.Gray)
@@ -636,9 +665,26 @@ fun SearchBar() {
 
 @Composable
 fun KategoriChips() {
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Surface(color = PrimaryOrangeColor, shape = RoundedCornerShape(16.dp), modifier = Modifier.weight(1f)) { Text("Makanan", color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), textAlign = TextAlign.Center) }
-        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp), modifier = Modifier.weight(1f)) { Text("Minuman", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), textAlign = TextAlign.Center) }
-        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp), modifier = Modifier.weight(1f)) { Text("Jajanan", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), textAlign = TextAlign.Center) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Surface(
+            color = PrimaryOrangeColor,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.weight(1f)
+        ) { Text("Makanan", color = Color.White, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), textAlign = TextAlign.Center) }
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.weight(1f)
+        ) { Text("Minuman", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), textAlign = TextAlign.Center) }
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.weight(1f)
+        ) { Text("Jajanan", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), textAlign = TextAlign.Center) }
     }
 }

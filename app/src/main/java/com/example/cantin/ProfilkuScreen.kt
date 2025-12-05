@@ -41,7 +41,14 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfilkuScreen(cartViewModel: CartViewModel, onBackClick: () -> Unit, onEditClick: () -> Unit) {
+fun ProfilkuScreen(
+    cartViewModel: CartViewModel,
+    onBackClick: () -> Unit,
+    onEditClick: () -> Unit,
+    onFavoritesClick: () -> Unit, // New parameter
+    onRateProductClick: () -> Unit,
+    onActivityClick: () -> Unit
+) {
     val userProfile by cartViewModel.userProfile.collectAsState()
 
     Scaffold(
@@ -57,7 +64,16 @@ fun ProfilkuScreen(cartViewModel: CartViewModel, onBackClick: () -> Unit, onEdit
             item { Text("Akun", modifier = Modifier.padding(start = 16.dp, bottom = 8.dp), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) }
             item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
             itemsIndexed(ACCOUNT_OPTIONS) { index, option ->
-                OptionRow(text = option, onClick = { /* Handle click for $option */ })
+                OptionRow(
+                    text = option,
+                    onClick = {
+                        when (option) {
+                            "Aktivitasku" -> onActivityClick()
+                            "Favoritku" -> onFavoritesClick()
+                            "Beri Rating/Ulasan" -> onRateProductClick()
+                        }
+                    }
+                )
                 if (index < ACCOUNT_OPTIONS.size - 1) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(start = 16.dp))
                 }
@@ -102,5 +118,5 @@ fun OptionRow(text: String, onClick: () -> Unit) {
 
 private val ACCOUNT_OPTIONS = listOf(
     "Aktivitasku", "Favoritku", "Metode Pembayaran",
-    "Pusat Bantuan", "Keamanan Akun", "Beri Rating"
+    "Pusat Bantuan", "Keamanan Akun", "Beri Rating/Ulasan"
 )
